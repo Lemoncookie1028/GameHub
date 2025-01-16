@@ -16,12 +16,18 @@
         header {
             background-color: #1f1f1f;
             padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         header h1 {
             margin: 0;
         }
+        nav {
+            display: flex;
+            gap: 10px;
+        }
         nav a {
-            margin: 0 10px;
             color: #ff6347;
             text-decoration: none;
         }
@@ -41,10 +47,14 @@
             border-radius: 8px;
             width: 200px;
             padding: 1rem;
+            text-align: center;
         }
         .game-card img {
             width: 100%;
             border-radius: 8px;
+        }
+        .game-card p {
+            font-size: 0.9rem;
         }
         footer {
             background-color: #1f1f1f;
@@ -54,57 +64,38 @@
         .add-game-section {
             margin: 2rem 0;
         }
-        .add-game-section button {
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
-            color: #ffffff;
-            background-color: #ff6347;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .add-game-section button:hover {
-            background-color: #ff4500;
-        }
-        .game-inputs input {
+        .add-game-section input, .add-game-section button {
             margin: 0.5rem;
             padding: 0.5rem;
-            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+        #search-bar {
+            padding: 0.5rem;
+            border: 1px solid #333;
             border-radius: 5px;
+            font-size: 1rem;
+            margin-top: 1rem;
         }
     </style>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
 </head>
 <body>
     <header>
         <h1>Game Hub</h1>
-        <nav>
-            <a href="#popular">Popular Games</a>
-            <a href="#new">New Releases</a>
-        </nav>
+        <input type="text" id="search-bar" placeholder="Search games..." oninput="searchGames()">
     </header>
 
     <main>
         <section class="add-game-section">
             <h2>Add a Game</h2>
-            <div class="game-inputs">
-                <input type="text" id="game-title" placeholder="Game Title" required>
-                <input type="text" id="game-url" placeholder="Game URL (e.g., Itch.io)" required>
-                <input type="file" id="game-thumbnail" accept="image/*" required>
-            </div>
-            <button id="add-game-button" onclick="addGame()">Add Game</button>
+            <input type="text" id="game-name" placeholder="Game Name">
+            <input type="url" id="game-link" placeholder="Game Link">
+            <input type="file" id="game-thumbnail" accept="image/*">
+            <button onclick="addGame()">Add Game</button>
         </section>
 
-        <section id="popular">
-            <h2>Popular Games</h2>
-            <div class="container" id="game-container"></div>
-        </section>
-
-        <section id="new">
-            <h2>New Releases</h2>
-            <div class="container" id="new-container"></div>
+        <section id="games">
+            <h2>Games</h2>
+            <div id="games-container" class="container"></div>
         </section>
     </main>
 
@@ -112,105 +103,108 @@
         <p>&copy; 2025 Game Hub. All rights reserved.</p>
     </footer>
 
-    <script>
-        // Firebase setup
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push, update } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-storage.js";
+
+        // Your web app's Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyD7lfjWo4FQHPJ28XJTZvXiMs4GDKNFiDQ",
+            authDomain: "game-hub1028.firebaseapp.com",
+            projectId: "game-hub1028",
+            storageBucket: "game-hub1028.appspot.com",
+            messagingSenderId: "634806654590",
+            appId: "1:634806654590:web:2ff668ba36b07943522a2f",
+            measurementId: "G-RV9698QQZX"
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const storage = getStorage(app);
 
-        // Function to add a new game
-        function addGame() {
-            const gameTitle = document.getElementById("game-title").value;
-            const gameUrl = document.getElementById("game-url").value;
-            const gameThumbnail = document.getElementById("game-thumbnail").files[0];
+        // Add Game Function
+        async function addGame() {
+            const name = document.getElementById('game-name').value;
+            const link = document.getElementById('game-link').value;
+            const thumbnailFile = document.getElementById('game-thumbnail').files[0];
 
-            if (gameTitle === "" || gameUrl === "" || !gameThumbnail) {
-                alert("Please provide the game title, URL, and thumbnail.");
+            if (!name || !link || !thumbnailFile) {
+                alert("Please fill in all fields!");
                 return;
             }
 
-            const thumbnailUrl = URL.createObjectURL(gameThumbnail); // Temporary URL for thumbnail image
+            try {
+                // Upload thumbnail to Firebase Storage
+                const thumbnailStorageRef = storageRef(storage, `thumbnails/${thumbnailFile.name}`);
+                const snapshot = await uploadBytes(thumbnailStorageRef, thumbnailFile);
+                const thumbnailUrl = await getDownloadURL(snapshot.ref);
 
-            // Game data
-            const game = {
-                title: gameTitle,
-                url: gameUrl,
-                thumbnail: thumbnailUrl,
-                plays: 0
-            };
+                // Save game details in Firebase Realtime Database
+                const gamesRef = ref(database, 'games');
+                const newGameRef = push(gamesRef);
+                await set(newGameRef, {
+                    name,
+                    link,
+                    thumbnail: thumbnailUrl,
+                    plays: 0
+                });
 
-            // Store game in Firebase
-            const gamesRef = db.ref('games');
-            gamesRef.push(game).then(() => {
                 alert("Game added successfully!");
-                loadGames(); // Reload the games after adding a new one
-            });
+                loadGames(); // Refresh the game list
+            } catch (error) {
+                console.error("Error adding game:", error);
+                alert("Failed to add the game. Please try again.");
+            }
         }
 
-        // Function to load games from Firebase
+        // Load Games Function
         function loadGames() {
-            const gamesRef = db.ref('games');
-            gamesRef.on('child_added', (snapshot) => {
-                const game = snapshot.val();
+            const gamesContainer = document.getElementById('games-container');
+            gamesContainer.innerHTML = ''; // Clear existing games
 
-                const gameContainer = document.getElementById("game-container");
-                const gameCard = document.createElement("div");
-                gameCard.classList.add("game-card");
-
-                const gameThumbnailElement = document.createElement("img");
-                gameThumbnailElement.src = game.thumbnail;
-                gameCard.appendChild(gameThumbnailElement);
-
-                const gameName = document.createElement("h3");
-                gameName.innerText = game.title;
-                gameCard.appendChild(gameName);
-
-                const playButton = document.createElement("button");
-                playButton.classList.add("play-button");
-                playButton.innerText = "Play Game";
-                playButton.onclick = function() {
-                    window.open(game.url, "_blank");
-                    incrementPlays(game);
-                };
-                gameCard.appendChild(playButton);
-
-                const playsCount = document.createElement("p");
-                playsCount.classList.add("plays-count");
-                playsCount.innerText = `Plays: ${game.plays}`;
-                gameCard.appendChild(playsCount);
-
-                gameContainer.appendChild(gameCard);
-            });
-        }
-
-        // Increment play count for a game
-        function incrementPlays(game) {
-            const gamesRef = db.ref('games');
-            gamesRef.once('value').then((snapshot) => {
+            const gamesRef = ref(database, 'games');
+            onValue(gamesRef, (snapshot) => {
                 const games = snapshot.val();
-                const gameId = Object.keys(games).find(key => games[key].title === game.title);
-                if (gameId) {
-                    const gameRef = db.ref('games/' + gameId);
-                    gameRef.update({
-                        plays: game.plays + 1
-                    });
+                gamesContainer.innerHTML = ''; // Clear and repopulate
+                for (const id in games) {
+                    const game = games[id];
+                    const gameCard = document.createElement('div');
+                    gameCard.className = 'game-card';
+                    gameCard.innerHTML = `
+                        <img src="${game.thumbnail}" alt="${game.name}">
+                        <h3>${game.name}</h3>
+                        <p>Plays: ${game.plays}</p>
+                        <button onclick="playGame('${id}', '${game.link}')">Play</button>
+                    `;
+                    gamesContainer.appendChild(gameCard);
                 }
             });
         }
 
-        // Call loadGames on page load
-        window.onload = loadGames;
+        // Play Game Function
+        function playGame(id, link) {
+            const gameRef = ref(database, `games/${id}/plays`);
+            update(gameRef, { plays: (plays) => (plays || 0) + 1 }); // Increment play count
+            window.open(link, '_blank'); // Open game in a new tab
+        }
 
+        // Search Games Function
+        function searchGames() {
+            const query = document.getElementById('search-bar').value.toLowerCase();
+            const gamesContainer = document.getElementById('games-container');
+            const cards = gamesContainer.getElementsByClassName('game-card');
+
+            Array.from(cards).forEach(card => {
+                const name = card.querySelector('h3').innerText.toLowerCase();
+                card.style.display = name.includes(query) ? '' : 'none';
+            });
+        }
+
+        // Initialize the app on page load
+        document.addEventListener('DOMContentLoaded', loadGames);
     </script>
 </body>
 </html>
-
