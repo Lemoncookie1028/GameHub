@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+        }
+        header {
+            background-color: #1f1f1f;
+            padding: 1rem;
+        }
+        header h1 {
+            margin: 0;
+        }
+        nav a {
+            margin: 0 10px;
+            color: #ff6347;
+            text-decoration: none;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .game-card {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            width: 200px;
+            padding: 1rem;
+        }
+        .game-card img {
+            width: 100%;
+            border-radius: 8px;
+        }
+        footer {
+            background-color: #1f1f1f;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .add-game-section {
+            margin: 2rem 0;
+        }
+        .add-game-section button {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            color: #ffffff;
+            background-color: #ff6347;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .add-game-section button:hover {
+            background-color: #ff4500;
+        }
+        .game-inputs input {
+            margin: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Game Hub</h1>
+        <nav>
+            <a href="#popular">Popular Games</a>
+            <a href="#new">New Releases</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="add-game-section">
+            <h2>Add a Game</h2>
+            <div class="game-inputs">
+                <input type="text" id="game-title" placeholder="Game Title" required>
+                <input type="text" id="game-url" placeholder="Game URL (e.g., Itch.io)" required>
+                <input type="file" id="game-thumbnail" accept="image/*" required>
+            </div>
+            <button id="add-game-button" onclick="addGame()">Add Game</button>
+        </section>
+
+        <section id="popular">
+            <h2>Popular Games</h2>
+            <div class="container" id="game-container"></div>
+        </section>
+
+        <section id="new">
+            <h2>New Releases</h2>
+            <div class="container" id="new-container"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Game Hub. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Firebase setup
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Function to add a new game
+        function addGame() {
+            const gameTitle = document.getElementById("game-title").value;
+            const gameUrl = document.getElementById("game-url").value;
+            const gameThumbnail = document.getElementById("game-thumbnail").files[0];
+
+            if (gameTitle === "" || gameUrl === "" || !gameThumbnail) {
+                alert("Please provide the game title, URL, and thumbnail.");
+                return;
+            }
+
+            const thumbnailUrl = URL.createObjectURL(gameThumbnail); // Temporary URL for thumbnail image
+
+            // Game data
+            const game = {
+                title: gameTitle,
+                url: gameUrl,
+                thumbnail: thumbnailUrl,
+                plays: 0
+            };
+
+            // Store game in Firebase
+            const gamesRef = db.ref('games');
+            gamesRef.push(game).then(() => {
+                alert("Game added successfully!");
+                loadGames(); // Reload the games after adding a new one
+            });
+        }
+
+        // Function to load games from Firebase
+        function loadGames() {
+            const gamesRef = db.ref('games');
+            gamesRef.on('child_added', (snapshot) => {
+                const game = snapshot.val();
+
+                const gameContainer = document.getElementById("game-container");
+                const gameCard = document.createElement("div");
+                gameCard.classList.add("game-card");
+
+                const gameThumbnailElement = document.createElement("img");
+                gameThumbnailElement.src = game.thumbnail;
+                gameCard.appendChild(gameThumbnailElement);
+
+                const gameName = document.createElement("h3");
+                gameName.innerText = game.title;
+                gameCard.appendChild(gameName);
+
+                const playButton = document.createElement("button");
+                playButton.classList.add("play-button");
+                playButton.innerText = "Play Game";
+                playButton.onclick = function() {
+                    window.open(game.url, "_blank");
+                    incrementPlays(game);
+                };
+                gameCard.appendChild(playButton);
+
+                const playsCount = document.createElement("p");
+                playsCount.classList.add("plays-count");
+                playsCount.innerText = `Plays: ${game.plays}`;
+                gameCard.appendChild(playsCount);
+
+                gameContainer.appendChild(gameCard);
+            });
+        }
+
+        // Increment play count for a game
+        function incrementPlays(game) {
+            const gamesRef = db.ref('games');
+            gamesRef.once('value').then((snapshot) => {
+                const games = snapshot.val();
+                const gameId = Object.keys(games).find(key => games[key].title === game.title);
+                if (gameId) {
+                    const gameRef = db.ref('games/' + gameId);
+                    gameRef.update({
+                        plays: game.plays + 1
+                    });
+                }
+            });
+        }
+
+        // Call loadGames on page load
+        window.onload = loadGames;
+
+    </script>
+</body>
+</html>
+
