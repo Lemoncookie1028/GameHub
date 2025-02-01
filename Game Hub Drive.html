@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+        }
+        header {
+            background-color: #1f1f1f;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            margin: 0;
+        }
+        nav {
+            display: flex;
+            gap: 10px;
+        }
+        nav a {
+            color: #ff6347;
+            text-decoration: none;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .game-card {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            width: 200px;
+            padding: 1rem;
+            text-align: center;
+        }
+        footer {
+            background-color: #1f1f1f;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .add-game-section {
+            margin: 2rem 0;
+        }
+        #search-bar {
+            padding: 0.5rem;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+    </style>
+    <script>
+        const sheetID = "10TA6P6O3TAXtYXNhZZe9WTdW4VT8dvtJCNmjfCR1__8";
+        const apiKey = "AIzaSyDJLUbSswOZYqYYc5w3e4bEemsh9rLcahw";
+        const sheetURL = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/Games?key=${apiKey}`;
+
+        async function loadGames() {
+            const response = await fetch(sheetURL);
+            const data = await response.json();
+            const games = data.values;
+            const gamesContainer = document.getElementById('games-container');
+            gamesContainer.innerHTML = '';
+
+            for (let i = 1; i < games.length; i++) {
+                const game = games[i];
+                const gameCard = document.createElement('div');
+                gameCard.className = 'game-card';
+                gameCard.innerHTML = `
+                    <h3>${game[0]}</h3>
+                    <p>Plays: ${game[2]}</p>
+                    <button onclick="playGame('${game[1]}')">Play</button>
+                `;
+                gamesContainer.appendChild(gameCard);
+            }
+        }
+
+        function playGame(link) {
+            window.open(link, '_blank');
+        }
+
+        function searchGames() {
+            const query = document.getElementById('search-bar').value.toLowerCase();
+            const gamesContainer = document.getElementById('games-container');
+            const cards = gamesContainer.getElementsByClassName('game-card');
+            Array.from(cards).forEach(card => {
+                const name = card.querySelector('h3').innerText.toLowerCase();
+                card.style.display = name.includes(query) ? '' : 'none';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadGames);
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Game Hub</h1>
+        <div>
+            <input type="text" id="search-bar" placeholder="Search games..." oninput="searchGames()">
+            <button onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLSffb7E8wgyfTzSXeoP26nSdssptfCGFyptr7SgXgw5WNkX9nw/viewform', '_blank')" style="background-color: #ff6347; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer;">
+                Submit a Game
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <section id="games">
+            <h2>Games</h2>
+            <div id="games-container" class="container"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Game Hub. All rights reserved.</p>
+    </footer>
+</body>
+</html>
+
